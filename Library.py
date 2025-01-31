@@ -1,72 +1,96 @@
 class Book:
-    def __init__(self, title, author, genre, id):
+    def __init__(self, title, author, genre, book_id):
         self.title = title
         self.author = author
         self.genre = genre
-        self.id = id 
-        self.is_avaliable = True 
-        self.borrowed_by = None
+        self.book_id = book_id
+        self._is_available = True
+        self._borrowed_by = None
+
+    def borrow(self, user):
+        if self._is_available:
+            self._is_available = False
+            self._borrowed_by = user.name
+            return f"{user.name} borrowed '{self.title}'."
+        return f"'{self.title}' is not available."
+
+    def return_book(self):
+        if not self._is_available:
+            borrower = self._borrowed_by
+            self._is_available = True
+            self._borrowed_by = None
+            return f"'{self.title}' returned by {borrower}."
+        return f"'{self.title}' was not borrowed."
+
+    def is_available(self):
+        return self._is_available
+
+    def borrowed_by(self):
+        return self._borrowed_by
+
 
 class User:
-    def __init__(self, user_type, name):
-        self.user_type = user_type
+    def __init__(self, name):
         self.name = name
-        self.book_count = 0
+        self.borrowed_books = []
+
+    def borrow_book(self, book):
+        if book.is_available():
+            self.borrowed_books.append(book)
+            return book.borrow(self)
+        return f"{self.name} cannot borrow '{book.title}' as it is unavailable."
+
+    def return_book(self, book):
+        if book in self.borrowed_books:
+            self.borrowed_books.remove(book)
+            return book.return_book()
+        return f"{self.name} does not have '{book.title}'."
+
+    def borrowed_count(self):
+        return len(self.borrowed_books)
+
+
+class RegularMember(User):
+    MAX_BOOKS = 3
+
+    def borrow_book(self, book):
+        if len(self.borrowed_books) >= self.MAX_BOOKS:
+            return f"{self.name} has reached the borrowing limit ({self.MAX_BOOKS} books)."
+        return super().borrow_book(book)
+
+
+class Librarian(User):
+    def add_book(self, library, book):
+        library.add_book(book)
+        return f"{self.name} added '{book.title}' to the library."
+
+    def remove_book(self, library, book):
+        return library.remove_book(book)
+
 
 class Library:
-
     def __init__(self):
         self.books = []
 
-    def borrow_book(self, book, user):
-        if user.user_type == "Regular Member":
-            if user.book_count < 3:
-                if book in self.books and book.is_avaliable:
-                    book.is_avaliable = False 
-                    user.book_count += 1
-                else:
-                    return f"{book.title} is not avaliable in the library"
-            else:
-                return f"As a {user.user_type} you can only borrow 3 books total."
-        else: 
-            book.is_avaliable = False 
-            user.book_count += 1
-            book.borrowed_by = user.name
-        return f"A {user.user_type} has borrowed {book.title}."
-    
-    def return_book(self, book, user):
-        book.is_avaliable = True
-        book.borrowed_by = None
-        user.book_count -= 1
-        return f"{book.title} has been returned."
-    
-    def add_book(self, book, user):
-        if user.user_type == "Librarian":
-            self.books.append(book)
-            return f"{book.title} has been added to the library."
-        return f"A {user.user_type} cannot add books to the library."
-    
-    def remove_book(self, book, user):
-        if user.user_type == "Librarian":
+    def add_book(self, book):
+        self.books.append(book)
+
+    def remove_book(self, book):
+        if book in self.books and book.is_available():
             self.books.remove(book)
-            return f"{book.title} has been removed from the library."
-        return f"A {user.user_type} cannot remove books from the library."
-    
-    def book_search(self, keyword):
-        for book in self.books:
-            if keyword in book.title or keyword in book.genre or keyword in book.author:
-                return f"{book.title} has been found at the library."
-            
-        return f"Could not find {keyword}."
-    
+            return f"'{book.title}' removed from the library."
+        return f"Cannot remove '{book.title}' as it is currently borrowed."
+
+    def search_books(self, keyword):
+        matches = [book for book in self.books if keyword.lower() in book.title.lower() or 
+                   keyword.lower() in book.author.lower() or keyword.lower() in book.genre.lower()]
+        return matches if matches else f"No books found for '{keyword}'."
+
     def display_status(self):
-        for book in self.books:
-            if book.is_avaliable:
-                print(f"{book.title} is avaliable.")
-            else:
-                print(f"{book.title} is borrowed by {book.borrowed_by}.")
+        available_books = [book.title for book in self.books if book.is_available()]
+        borrowed_books = [(book.title, book.borrowed_by()) for book in self.books if not book.is_available()]
 
-        return
-
-
-
+        return {
+            "Available Books": available_books,
+            "Borrowed Books": borrowed_books
+        }
